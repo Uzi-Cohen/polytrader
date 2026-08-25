@@ -21,11 +21,11 @@ polytrader init-db
 
 polytrader scan-polymarket --category politics --limit 20
 polytrader ingest-contracts --keyword "artificial intelligence" --agency "Department of Defense"
-polytrader ingest-congress
+polytrader ingest-congress          # ingests Senate disclosures + auto-mirrors actionable ones as paper trades
 polytrader signals
 polytrader portfolio
-polytrader risk-check --asset-class polymarket --bankroll 10000 --proposed-size 500 \
-  --fair-probability 0.6 --market-price 0.45
+polytrader risk-check --market-or-symbol some-market-id --bankroll 10000 \
+  --fair-probability 0.6 --executable-price 0.45
 ```
 
 All commands work against real, free, public APIs (Polymarket Gamma,
@@ -35,6 +35,14 @@ data mirror) — no API keys required for paper-mode data ingestion. Setting
 probability estimator (`polytrader/polymarket/research.py`); without it,
 forecasts simply aren't generated — the system never fabricates a
 probability to fill the gap.
+
+Every connector above targets the real, live endpoint. This was built in
+a sandbox whose egress policy blocks everything except GitHub-hosted
+content, so only `ingest-congress`'s Senate path could be verified live
+end-to-end during development (see `docs/DATA_SOURCES.md`) — the rest are
+covered by fixture tests against recorded real response shapes and should
+be spot-checked against a live response the first time they run somewhere
+with normal internet access.
 
 ## Status
 
