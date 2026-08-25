@@ -355,6 +355,11 @@ class CongressTrade(Base):
     when it became public -- the gap between them (statutorily up to 45
     days) is preserved, never collapsed, because it determines whether a
     mirror strategy is even chasing information that's still actionable.
+    disclosure_date is nullable: the bulk aggregate feed
+    (senate_client.fetch_all_transactions) doesn't carry it per-transaction,
+    only the daily filing index does (senate_client.fetch_daily_filing) --
+    a NULL here means "we don't actually know the lag," not "same day,"
+    and mirror_strategy.py refuses to size a trade until it does know.
     """
 
     __tablename__ = "congress_trades"
@@ -365,7 +370,7 @@ class CongressTrade(Base):
     asset_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     transaction_type: Mapped[str] = mapped_column(String)  # purchase | sale_full | sale_partial | exchange
     transaction_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    disclosure_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    disclosure_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     amount_range_low: Mapped[float | None] = mapped_column(Float, nullable=True)
     amount_range_high: Mapped[float | None] = mapped_column(Float, nullable=True)
     source_document_id: Mapped[str | None] = mapped_column(
