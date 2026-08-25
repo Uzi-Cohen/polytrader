@@ -54,6 +54,15 @@ _MIN_CONVICTION_MULTIPLIER = 0.25
 _FRESH_EDGE = 0.12
 _EDGE_HALF_LIFE_DAYS = 20.0
 
+# The risk engine's default staleness gate (core/config.py,
+# max_data_staleness_seconds, 900s) is tuned for Polymarket market quotes
+# and would reject every disclosure here regardless of recency -- STOCK
+# Act filings are day-granularity by nature. 90 days gives real headroom
+# past the 45-day statutory filing deadline; the continuous edge decay
+# above is what actually judges "too stale to bother," not this gate --
+# this only exists to catch corrupted/nonsensical timestamps.
+_MAX_STALENESS_SECONDS = 90 * 86_400
+
 
 @dataclass(frozen=True)
 class MirrorProposal:
@@ -108,6 +117,7 @@ def build_mirror_proposal(
         confidence=min(1.0, conviction / _MAX_CONVICTION_MULTIPLIER),
         data_timestamp=ensure_aware(trade.disclosure_date),
         now=now,
+        max_staleness_seconds=_MAX_STALENESS_SECONDS,
     )
     return MirrorProposal(
         trade_proposal=proposal, congress_trade_id=trade.trade_id, ticker=trade.ticker, direction=direction

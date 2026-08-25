@@ -140,6 +140,19 @@ def test_thesis_cooldown_blocks_reentry():
     assert "thesis_cooldown" in decision.limits_hit
 
 
+def test_proposal_can_override_staleness_limit():
+    engine = RiskEngine(make_limits(max_data_staleness_seconds=900))
+    old_but_overridden = make_proposal(
+        data_timestamp=NOW - timedelta(days=30), max_staleness_seconds=90 * 86_400
+    )
+    decision = engine.evaluate(old_but_overridden, make_portfolio())
+    assert "stale_data" not in decision.limits_hit
+
+    old_without_override = make_proposal(data_timestamp=NOW - timedelta(days=30))
+    decision2 = engine.evaluate(old_without_override, make_portfolio())
+    assert "stale_data" in decision2.limits_hit
+
+
 def test_missing_sizing_input_rejected():
     engine = RiskEngine(make_limits())
     decision = engine.evaluate(make_proposal(fair_probability=None), make_portfolio())

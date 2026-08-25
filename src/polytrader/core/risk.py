@@ -117,6 +117,14 @@ class TradeProposal:
     manual_override: bool = False
     data_timestamp: datetime | None = None
     now: datetime | None = None
+    # Overrides RiskLimits.max_data_staleness_seconds for this proposal.
+    # Polymarket market quotes go stale in minutes; a STOCK Act disclosure
+    # is inherently day-granularity evidence, so the same 900s default
+    # would reject every congress-mirror trade regardless of how recent
+    # the disclosure actually was. Each signal generator declares what
+    # "fresh enough" means for its own evidence type; the engine's
+    # configured default only applies when a proposal doesn't override it.
+    max_staleness_seconds: int | None = None
 
 
 @dataclass(frozen=True)
@@ -145,13 +153,15 @@ class RiskEngine:
 
         # FR-RISK-08: reject on stale evidence.
         if proposal.data_timestamp is not None:
+            staleness_limit = (
+                proposal.max_staleness_seconds
+                if proposal.max_staleness_seconds is not None
+                else self.limits.max_data_staleness_seconds
+            )
             age_seconds = (now - proposal.data_timestamp).total_seconds()
-            if age_seconds > self.limits.max_data_staleness_seconds:
+            if age_seconds > staleness_limit:
                 limits_hit.append("stale_data")
-                reasons.append(
-                    f"Data is {age_seconds:.0f}s old, exceeds max "
-                    f"{self.limits.max_data_staleness_seconds}s"
-                )
+                reasons.append(f"Data is {age_seconds:.0f}s old, exceeds max {staleness_limit}s")
 
         if proposal.adjusted_edge < self.limits.min_adjusted_edge:
             limits_hit.append("edge_below_threshold")
