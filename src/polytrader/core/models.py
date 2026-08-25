@@ -207,6 +207,12 @@ class Order(Base):
 
 
 class Position(Base):
+    """At most one OPEN (closed_at is None) row should exist per
+    (asset_class, market_id/symbol, side) at a time -- enforced in
+    application logic (polymarket/paper_portfolio.py), not a DB constraint,
+    since a plain UniqueConstraint here would also block ever reopening a
+    position after it's been closed."""
+
     __tablename__ = "positions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
@@ -221,10 +227,6 @@ class Position(Base):
     unrealized_pnl: Mapped[float] = mapped_column(Float, default=0.0)
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint("asset_class", "market_id", "symbol", "side", name="uq_open_position"),
-    )
 
 
 class TradeDecision(Base):

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./polytrader.db"
 
     anthropic_api_key: str | None = None
+    research_model: str = "claude-sonnet-5"
 
     # --- Risk engine limits (PRD 1 section 7) ---
     max_risk_per_trade_pct: float = 0.02
