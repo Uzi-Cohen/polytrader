@@ -26,6 +26,9 @@ polytrader signals
 polytrader portfolio
 polytrader risk-check --market-or-symbol some-market-id --bankroll 10000 \
   --fair-probability 0.6 --executable-price 0.45
+
+# How would the congress-mirror strategy have done historically?
+polytrader backtest-congress-mirror --start 2015-01-01 --end 2025-01-01
 ```
 
 All commands work against real, free, public APIs (Polymarket Gamma,

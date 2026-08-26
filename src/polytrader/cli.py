@@ -10,9 +10,11 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from polytrader.congress.backtest import DEFAULT_ASSUMED_DISCLOSURE_LAG_DAYS, run_backtest
 from polytrader.congress.house_client import HouseClerkClient
 from polytrader.congress.ingest import ingest_house_filing_index_entry, ingest_senate_trade
 from polytrader.congress.mirror_strategy import mirror_trade
+from polytrader.congress.price_history import StooqClient
 from polytrader.congress.senate_client import SenateStockWatcherClient
 from polytrader.contracts.federal_register_client import FederalRegisterClient
 from polytrader.contracts.ingest import ingest_contract_award, ingest_register_document
@@ -179,6 +181,78 @@ def ingest_house_filings_command(year: int = typer.Option(datetime.now(timezone.
             ingest_house_filing_index_entry(session, entry)
 
     console.print(f"[green]Indexed {len(entries)} House filing(s) for {year} (metadata only).[/green]")
+
+
+@app.command("backtest-congress-mirror")
+def backtest_congress_mirror_command(
+    start: str = typer.Option(..., help="ISO date, e.g. 2015-01-01."),
+    end: str = typer.Option(..., help="ISO date, e.g. 2025-01-01."),
+    starting_bankroll: float = typer.Option(100_000.0),
+    base_unit: float = typer.Option(250.0, help="Base paper-mirror dollar size before conviction scaling."),
+    fee_bps: float = typer.Option(10.0, help="Flat fee/slippage assumption (bps), applied on entry and exit."),
+    assumed_disclosure_lag_days: int = typer.Option(
+        DEFAULT_ASSUMED_DISCLOSURE_LAG_DAYS,
+        help="Days after transaction_date assumed as disclosure_date (the bulk feed has no real per-trade filing date).",
+    ),
+) -> None:
+    """How would the congress-mirror strategy have done historically?
+    Pulls the real Senate disclosure history and real historical prices
+    (Stooq), then replays them chronologically through the exact
+    proposal-building and risk-gating logic the live system uses. Read
+    congress/backtest.py's docstring for every assumption this makes
+    before trusting the numbers -- it's not a full-fidelity simulation."""
+    settings = get_settings()
+    start_date = date.fromisoformat(start)
+    end_date = date.fromisoformat(end)
+
+    with SenateStockWatcherClient() as senate_client, StooqClient() as price_client:
+        trades = senate_client.fetch_all_transactions()
+        report = run_backtest(
+            trades,
+            start_date=start_date,
+            end_date=end_date,
+            starting_bankroll=starting_bankroll,
+            base_mirror_unit=base_unit,
+            risk_limits=RiskLimits.from_settings(settings),
+            price_client=price_client,
+            fee_bps=fee_bps,
+            assumed_disclosure_lag_days=assumed_disclosure_lag_days,
+        )
+
+    console.print(f"[bold]Congress-mirror backtest, {start_date} to {end_date}[/bold]")
+    console.print(f"Disclosures considered:    {report.considered}")
+    console.print(f"  not actionable:          {report.skipped_not_actionable}")
+    console.print(f"  no price data available: {report.skipped_no_price_data}")
+    console.print(f"  rejected by risk engine: {report.skipped_by_risk_engine}")
+    console.print(f"  closed trades:           {len(report.closed_trades)}")
+    console.print()
+    console.print(f"Starting bankroll: ${report.starting_bankroll:,.2f}")
+    console.print(f"Ending bankroll:   ${report.ending_bankroll:,.2f}")
+    console.print(f"Total return:      {report.total_return_pct:+.2f}%")
+    console.print(f"Win rate:          {report.win_rate:.1%}")
+    console.print(f"Max drawdown:      {report.max_drawdown_pct:.2f}%")
+    console.print(
+        f"[dim]Assumed disclosure lag: {report.assumed_disclosure_lag_days} days "
+        "(the bulk feed has no real per-trade filing date). "
+        "See congress/backtest.py's docstring for every other assumption baked into this run.[/dim]"
+    )
+
+    if report.closed_trades:
+        table = Table(title="Closed trades (most recent 20)")
+        for column in ("Ticker", "Entry", "Exit", "Entry $", "Exit $", "PnL", "PnL %", "Reason"):
+            table.add_column(column)
+        for t in sorted(report.closed_trades, key=lambda t: t.exit_date, reverse=True)[:20]:
+            table.add_row(
+                t.ticker,
+                str(t.entry_date),
+                str(t.exit_date),
+                f"{t.entry_price:.2f}",
+                f"{t.exit_price:.2f}",
+                f"${t.pnl:,.2f}",
+                f"{t.pnl_pct:+.1f}%",
+                t.exit_reason,
+            )
+        console.print(table)
 
 
 @app.command("signals")

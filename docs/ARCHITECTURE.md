@@ -76,6 +76,23 @@ because it wasn't wired through the shared gate — there's only one gate.
   doesn't require touching anything downstream, since they still just
   produce `Signal` / canonical `Organization` rows.
 
+## Backtesting the congress mirror
+
+`congress/backtest.py` (`polytrader backtest-congress-mirror`) replays the
+real Senate disclosure history against real historical stock prices
+(Stooq), reusing the *exact* proposal-building and risk-gating code the
+live mirror strategy uses -- it's the live strategy driven by history, not
+a separate simulation that could quietly diverge from it. It is explicitly
+not full-fidelity: it assumes same-day detection of every disclosure, an
+assumed (configurable) disclosure lag since the bulk history feed has no
+real per-transaction filing date, an exit-on-next-disclosed-sale rule, and
+flat fee/slippage instead of real historical spreads. Every assumption is
+stated in the module docstring and the report always shows how many
+disclosures were skipped and why (not actionable, no price data, rejected
+by the risk engine) rather than only showing the trades that worked. There
+is no equivalent for the Polymarket side yet -- that needs Polymarket's
+separate historical Data API, which isn't integrated (see Roadmap).
+
 ## Roadmap (beyond this build)
 
 - Phase 2: FastAPI + web dashboard, alerting (email/Discord/Telegram),
@@ -87,4 +104,7 @@ because it wasn't wired through the shared gate — there's only one gate.
   duration, positive friction-adjusted expectancy, calibration tracking,
   tested kill switch, explicit operator enablement).
 - Phase 4: multi-model research ensemble, portfolio optimization across
-  correlated events, backtest/replay + calibration reporting.
+  correlated events, a Polymarket historical-Data-API backtest (the
+  congress-mirror side already has one -- see above), and forecast
+  calibration reporting (Brier score / log loss over stored Polymarket
+  forecasts once ClaudeEstimator has produced enough of them).

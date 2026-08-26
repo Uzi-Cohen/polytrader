@@ -75,6 +75,24 @@ XML/paper images).
   uses the gap explicitly rather than pretending the signal is fresher
   than it is.
 
+## Historical stock prices — `congress/price_history.py`
+
+- **Endpoint:** `https://stooq.com/q/d/l/` (free, no key, daily CSV
+  history per ticker).
+- **Used for:** backtesting the congress mirror strategy only
+  (`congress/backtest.py`, `polytrader backtest-congress-mirror`) --
+  never in live/paper mode, which has no live price feed wired in (see
+  `congress/mirror_strategy.py`).
+- Not live-tested from inside this build's sandbox (same egress-policy
+  block as every other non-GitHub host). The backtest pipeline itself
+  *was* run end-to-end against the real, live Senate feed (8,350 real
+  transactions, 995 real tickers) with a synthetic flat price stand-in,
+  to prove the code handles real-world data shape and volume without
+  choking -- see `tests/test_backtest_live.py`. The price parsing itself
+  is fixture-tested against Stooq's documented CSV format
+  (`tests/test_price_history.py`); verify against a live response the
+  first time it runs somewhere that can reach the host.
+
 ## Not integrated (documented, not silently missing)
 
 - **SAM.gov** (entity/contract-opportunity data) — requires an
